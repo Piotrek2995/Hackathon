@@ -240,16 +240,14 @@ def home():
 @app.route('/upload', methods=['POST'])
 def upload():
     """
-    1. Zapisuje oryginały do uploads_raw
-    2. Kopiuje oryginał do uploads (żeby FE ZAWSZE miał co wyświetlić)
-    3. Próbuje przepuścić przez SAM3
-       - jak się uda: nadpisuje plik wersją z maskami i zapisuje JSON
-       - jak się nie uda: zostaje oryginał + pusty JSON
+    1. Saves original files to uploads_raw
+    2. Does NOT automatically process through SAM3
+    3. Returns list of uploaded raw filenames
     """
     if 'files' not in request.files:
         return jsonify({"error": "no files field"}), 400
 
-    saved_processed = []
+    saved_raw = []
 
     for f in request.files.getlist('files'):
         if f.filename == '':
@@ -259,79 +257,180 @@ def upload():
         base, ext = os.path.splitext(filename)
         ts = int(time.time() * 1000)
 
-        # 1. Zapis oryginału
+        # Save original
         raw_name = f"{base}_{ts}{ext}".lower()
         raw_path = os.path.join(RAW_UPLOAD_DIR, raw_name)
         f.save(raw_path)
+        
+        saved_raw.append(raw_name)
+        print(f"[UPLOAD] Saved raw image: {raw_name}")
 
-        # 2. Nazwa pliku, który widzi frontend
-        processed_name = f"{base}_{ts}_sam3.png".lower()
-        processed_path = os.path.join(RESULT_DIR, processed_name)
+    if not saved_raw:
+        return jsonify({"error": "no files uploaded"}), 500
 
-        try:
-            # Najpierw skopiuj oryginał, żeby było co wyświetlić nawet gdy SAM3 padnie
-            shutil.copy(raw_path, processed_path)
-
-            detections = []
-            # 3. Próba przetworzenia SAM3 – jak się wywali, zostaje kopia oryginału
-            try:
-                print(f"[UPLOAD] Uruchamiam SAM3 dla {raw_name}")
-                detections = run_sam3_on_image(raw_path, processed_path)
-                print(f"[UPLOAD] SAM3 OK: {processed_name}")
-            except Exception as e:
-                print(f"[UPLOAD] Błąd SAM3 dla {raw_name}: {e}")
-                # NIE rzucamy dalej – frontend i tak zobaczy obrazek (oryginał)
-
-            # 4. Zapis JSON-a z detekcjami
-            try:
-                json_name = processed_name.rsplit('.', 1)[0] + '.json'
-                json_path = os.path.join(DETECTIONS_DIR, json_name)
-                with open(json_path, 'w', encoding='utf-8') as jf:
-                    json.dump(
-                        {
-                            "image": processed_name,
-                            "raw_image": raw_name,
-                            "timestamp": ts,
-                            "detections": detections or []
-                        },
-                        jf,
-                        ensure_ascii=False,
-                        indent=2
-                    )
-                print(f"[UPLOAD] Zapisano JSON: {json_path}")
-            except Exception as e:
-                print(f"[UPLOAD] Błąd zapisu JSON dla {processed_name}: {e}")
-
-            saved_processed.append(processed_name)
-
-        except Exception as e:
-            print(f"[UPLOAD] Krytyczny błąd przy pliku {filename}: {e}")
-
-    if not saved_processed:
-        return jsonify({"error": "no files processed"}), 500
-
-    return jsonify({"status": "ok", "saved": saved_processed}), 200
+    return jsonify({"status": "ok", "uploaded": saved_raw}), 200
 
 
 @app.route('/images')
 def images():
     """
-    Zwraca listę PRZETWORZONYCH obrazów (z maskami).
+    Returns list of RAW (unprocessed) images.
     """
     files = []
-    for name in sorted(os.listdir(RESULT_DIR)):
-        if name.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.tiff', '.bmp')):
-            files.append(name)
+    try:
+        for name in sorted(os.listdir(RAW_UPLOAD_DIR)):
+            if name.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.tiff', '.bmp')):
+                files.append(name)
+    except FileNotFoundError:
+        pass
     return jsonify(files)
 
 
-@app.route('/uploads/<path:filename>')
-def uploaded_file(filename):
+@app.route('/images/processed')
+def processed_images():
     """
-    Serwujemy PRZETWORZONE obrazy (RESULT_DIR),
-    bo frontend odwołuje się do /uploads/<name>.
+    Returns list of PROCESSED images (with SAM3 masks).
+    """
+    files = []
+    try:
+        for name in sorted(os.listdir(RESULT_DIR)):
+            if name.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.tiff', '.bmp')):
+                files.append(name)
+    except FileNotFoundError:
+        pass
+    return jsonify(files)
+
+
+@app.route('/uploads/raw/<path:filename>')
+def raw_file(filename):
+    """
+    Serve RAW (unprocessed) images.
+    """
+    return send_from_directory(RAW_UPLOAD_DIR, filename)
+
+
+@app.route('/uploads/processed/<path:filename>')
+def processed_file(filename):
+    """
+    Serve PROCESSED images (with SAM3 masks).
     """
     return send_from_directory(RESULT_DIR, filename)
+
+
+@app.route('/process/<filename>', methods=['POST'])
+def process_single(filename):
+    """
+    Process a single image through SAM3.
+    """
+    safe = secure_filename(filename)
+    if safe != filename:
+        return jsonify({"error": "invalid filename"}), 400
+    
+    raw_path = os.path.join(RAW_UPLOAD_DIR, safe)
+    if not os.path.isfile(raw_path):
+        return jsonify({"error": "raw image not found"}), 404
+    
+    try:
+        # Generate processed filename
+        base, ext = os.path.splitext(safe)
+        processed_name = f"{base}_sam3.png".lower()
+        processed_path = os.path.join(RESULT_DIR, processed_name)
+        
+        print(f"[PROCESS] Processing {safe} through SAM3...")
+        detections = run_sam3_on_image(raw_path, processed_path)
+        print(f"[PROCESS] SAM3 completed: {processed_name}")
+        
+        # Save detection JSON
+        json_name = processed_name.rsplit('.', 1)[0] + '.json'
+        json_path = os.path.join(DETECTIONS_DIR, json_name)
+        ts = int(time.time() * 1000)
+        
+        with open(json_path, 'w', encoding='utf-8') as jf:
+            json.dump(
+                {
+                    "image": processed_name,
+                    "raw_image": safe,
+                    "timestamp": ts,
+                    "detections": detections or []
+                },
+                jf,
+                ensure_ascii=False,
+                indent=2
+            )
+        
+        return jsonify({
+            "status": "ok",
+            "processed_image": processed_name,
+            "detections": detections
+        }), 200
+        
+    except Exception as e:
+        print(f"[PROCESS] Error processing {safe}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/process/all', methods=['POST'])
+def process_all():
+    """
+    Process all raw images through SAM3.
+    """
+    try:
+        raw_images = [name for name in os.listdir(RAW_UPLOAD_DIR) 
+                      if name.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.tiff', '.bmp'))]
+    except FileNotFoundError:
+        return jsonify({"error": "no raw images found"}), 404
+    
+    results = []
+    errors = []
+    
+    for raw_name in raw_images:
+        raw_path = os.path.join(RAW_UPLOAD_DIR, raw_name)
+        base, ext = os.path.splitext(raw_name)
+        processed_name = f"{base}_sam3.png".lower()
+        processed_path = os.path.join(RESULT_DIR, processed_name)
+        
+        # Skip if already processed
+        if os.path.exists(processed_path):
+            print(f"[PROCESS_ALL] Skipping {raw_name} - already processed")
+            continue
+        
+        try:
+            print(f"[PROCESS_ALL] Processing {raw_name}...")
+            detections = run_sam3_on_image(raw_path, processed_path)
+            
+            # Save detection JSON
+            json_name = processed_name.rsplit('.', 1)[0] + '.json'
+            json_path = os.path.join(DETECTIONS_DIR, json_name)
+            ts = int(time.time() * 1000)
+            
+            with open(json_path, 'w', encoding='utf-8') as jf:
+                json.dump(
+                    {
+                        "image": processed_name,
+                        "raw_image": raw_name,
+                        "timestamp": ts,
+                        "detections": detections or []
+                    },
+                    jf,
+                    ensure_ascii=False,
+                    indent=2
+                )
+            
+            results.append({
+                "raw": raw_name,
+                "processed": processed_name,
+                "detections": len(detections)
+            })
+            
+        except Exception as e:
+            print(f"[PROCESS_ALL] Error processing {raw_name}: {e}")
+            errors.append({"file": raw_name, "error": str(e)})
+    
+    return jsonify({
+        "status": "ok",
+        "processed": results,
+        "errors": errors
+    }), 200
 
 
 @app.route('/images/<filename>', methods=['DELETE'])
@@ -339,14 +438,32 @@ def delete_image(filename):
     safe = secure_filename(filename)
     if safe != filename:
         return jsonify({"error": "invalid filename"}), 400
-    path = os.path.join(RESULT_DIR, safe)
-    if not os.path.isfile(path):
+    
+    # Delete from both raw and processed directories
+    deleted = []
+    raw_path = os.path.join(RAW_UPLOAD_DIR, safe)
+    if os.path.isfile(raw_path):
+        try:
+            os.remove(raw_path)
+            deleted.append("raw")
+        except OSError:
+            pass
+    
+    # Also try to delete processed version
+    base, ext = os.path.splitext(safe)
+    processed_name = f"{base}_sam3.png"
+    processed_path = os.path.join(RESULT_DIR, processed_name)
+    if os.path.isfile(processed_path):
+        try:
+            os.remove(processed_path)
+            deleted.append("processed")
+        except OSError:
+            pass
+    
+    if not deleted:
         return jsonify({"error": "not found"}), 404
-    try:
-        os.remove(path)
-    except OSError:
-        return jsonify({"error": "delete failed"}), 500
-    return jsonify({"status": "deleted", "filename": safe})
+    
+    return jsonify({"status": "deleted", "filename": safe, "deleted": deleted})
 
 
 @app.route('/detections')

@@ -97,9 +97,44 @@
             border: 1px solid #e5e7eb;
             box-shadow: 0 1px 2px rgba(0,0,0,0.08);
             transition: transform .15s ease;
+            cursor: pointer;
         }
         .images-grid img:hover { transform: scale(1.05); }
-        .thumb-wrapper { position: relative; }
+        .thumb-wrapper { 
+            position: relative; 
+        }
+        .thumb-actions {
+            position: absolute;
+            bottom: 4px;
+            left: 4px;
+            right: 4px;
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .thumb-wrapper:hover .thumb-actions {
+            opacity: 1;
+        }
+        .thumb-btn {
+            flex: 1;
+            background: rgba(37, 99, 235, 0.9);
+            color: #fff;
+            border: none;
+            padding: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: 500;
+            transition: background .15s;
+        }
+        .thumb-btn:hover {
+            background: rgba(30, 79, 204, 0.95);
+        }
+        .thumb-btn:disabled {
+            background: rgba(156, 163, 175, 0.9);
+            cursor: not-allowed;
+        }
         .delete-btn {
             position: absolute;
             top: 4px;
@@ -129,24 +164,93 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.08);
             padding: 16px;
             height: calc(100vh - 80px);
+            display: flex;
+            flex-direction: column;
         }
-        .map-title {
-            margin: 0 0 12px 0;
-            font-size: 20px;
-            font-weight: 700;
-            color: #1a1a1a;
-            text-align: left;
+        .tabs-header {
+            display: flex;
+            gap: 4px;
+            border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 16px;
+        }
+        .tab-button {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            color: #6b7280;
+            transition: all 0.2s;
+            position: relative;
+            bottom: -2px;
+        }
+        .tab-button:hover {
+            color: #2563eb;
+        }
+        .tab-button.active {
+            color: #2563eb;
+            border-bottom-color: #2563eb;
+        }
+        .tab-content {
+            display: none;
+            flex: 1;
+            overflow: auto;
+        }
+        .tab-content.active {
+            display: flex;
+            flex-direction: column;
         }
         .map-canvas {
-            height: calc(100% - 36px);
+            flex: 1;
             border-radius: 12px;
-            background: #eef2ff;
+            background: #f9fafb;
             border: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: #6b7280;
+            font-weight: 500;
+            overflow: auto;
+        }
+        .processed-image-display {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            padding: 8px;
+        }
+        .chart-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px;
+            min-height: 250px;
+        }
+        .chart-card h3 {
+            margin: 0 0 12px 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        .map-placeholder {
+            width: 100%;
+            height: 100%;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #6b7280;
-            font-weight: 500;
         }
 
         .btn-row {
@@ -344,6 +448,11 @@
             </div>
             <div class="card" id="imagesCard">
                 <h2>Zdjęcia</h2>
+                <div style="margin-bottom: 8px;">
+                    <button class="btn" onclick="processAllImages()" style="margin: 0; padding: 8px 12px; font-size: 13px; width: 100%;">
+                        🔄 Process All
+                    </button>
+                </div>
                 <div id="imagesThumbs" class="images-grid">
                     <div style="font-size:12px;color:#6b7280;grid-column:1/-1">Brak zdjęć</div>
                 </div>
@@ -373,11 +482,61 @@
             </div>
         </div>
 
-        <!-- Center map -->
+        <!-- Center content with tabs -->
         <div class="map-container">
-            <h2 class="map-title">Site Map</h2>
-            <div class="map-canvas">
-                Map placeholder — integrate Leaflet/Mapbox here
+            <div class="tabs-header">
+                <button class="tab-button active" onclick="switchTab('processed')">📷 Processed Photos</button>
+                <button class="tab-button" onclick="switchTab('charts')">📊 Charts</button>
+                <button class="tab-button" onclick="switchTab('map')">🗺️ Map</button>
+            </div>
+
+            <!-- Processed Photos Tab -->
+            <div class="tab-content active" id="tab-processed">
+                <div class="map-canvas" id="processedDisplay">
+                    <div style="text-align: center;">
+                        <p>No processed images yet</p>
+                        <p style="font-size: 13px; margin-top: 8px;">Upload images and click "Process" to see results here</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Tab -->
+            <div class="tab-content" id="tab-charts">
+                <div class="charts-container">
+                    <div class="chart-card">
+                        <h3>Object Detection Summary</h3>
+                        <canvas id="detectionChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Processing Timeline</h3>
+                        <canvas id="timelineChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Detection Confidence</h3>
+                        <canvas id="confidenceChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Project Progress</h3>
+                        <div id="progressStats" style="padding: 20px; text-align: center;">
+                            <div style="font-size: 48px; font-weight: 700; color: #2563eb; margin-bottom: 8px;">42%</div>
+                            <div style="color: #6b7280;">Completion Rate</div>
+                            <div style="margin-top: 16px; font-size: 14px; color: #6b7280;">
+                                Earthworks phase ongoing<br>
+                                Foundation preparation in progress
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Map Tab -->
+            <div class="tab-content" id="tab-map">
+                <div class="map-placeholder">
+                    <div style="text-align: center;">
+                        <p style="font-size: 18px; margin-bottom: 8px;">🗺️ Site Map</p>
+                        <p style="font-size: 14px;">Integrate Leaflet/Mapbox here</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -499,21 +658,145 @@
                 wrap.className = 'thumb-wrapper';
 
                 const img = document.createElement('img');
-                img.src = `/uploads/${name}`;
+                img.src = `/uploads/raw/${name}`;
                 img.alt = name;
                 img.title = name;
+                img.addEventListener('click', () => showProcessedImage(name));
 
                 const del = document.createElement('button');
                 del.className = 'delete-btn';
                 del.type = 'button';
                 del.textContent = '×';
                 del.title = 'Usuń';
-                del.addEventListener('click', () => deleteImage(name, del));
+                del.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteImage(name, del);
+                });
+
+                const actions = document.createElement('div');
+                actions.className = 'thumb-actions';
+                
+                const processBtn = document.createElement('button');
+                processBtn.className = 'thumb-btn';
+                processBtn.textContent = 'Process';
+                processBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    processSingleImage(name, processBtn);
+                });
+
+                actions.appendChild(processBtn);
 
                 wrap.appendChild(img);
                 wrap.appendChild(del);
+                wrap.appendChild(actions);
                 imagesThumbs.appendChild(wrap);
             });
+        }
+
+        async function processSingleImage(filename, btn) {
+            if (btn.disabled) return;
+            btn.disabled = true;
+            btn.textContent = '...';
+            
+            try {
+                const res = await fetch(`/process/${encodeURIComponent(filename)}`, { 
+                    method: 'POST' 
+                });
+                
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Processing failed');
+                }
+                
+                const data = await res.json();
+                addMessage(`✅ Processed ${filename} - Found ${data.detections.length} objects`, false);
+                await fetchDetections();
+                await fetchProcessedImages();
+                btn.textContent = '✓';
+                setTimeout(() => {
+                    btn.textContent = 'Process';
+                    btn.disabled = false;
+                }, 2000);
+            } catch (e) {
+                addMessage(`❌ Error processing ${filename}: ${e.message}`, false);
+                btn.textContent = 'Error';
+                setTimeout(() => {
+                    btn.textContent = 'Process';
+                    btn.disabled = false;
+                }, 2000);
+            }
+        }
+
+        async function processAllImages() {
+            addMessage('🔄 Processing all images...', false);
+            
+            try {
+                const res = await fetch('/process/all', { method: 'POST' });
+                
+                if (!res.ok) {
+                    throw new Error('Failed to process images');
+                }
+                
+                const data = await res.json();
+                const count = data.processed.length;
+                const errors = data.errors.length;
+                
+                if (count > 0) {
+                    addMessage(`✅ Processed ${count} image(s) successfully!`, false);
+                }
+                if (errors > 0) {
+                    addMessage(`⚠️ ${errors} image(s) failed to process`, false);
+                }
+                if (count === 0 && errors === 0) {
+                    addMessage('ℹ️ All images already processed', false);
+                }
+                
+                await fetchDetections();
+                await fetchProcessedImages();
+            } catch (e) {
+                addMessage(`❌ Error: ${e.message}`, false);
+            }
+        }
+
+        async function fetchProcessedImages() {
+            try {
+                const res = await fetch('/images/processed');
+                if (!res.ok) return;
+                const data = await res.json();
+                // Just store for now, we'll show them when clicked
+                window.processedImages = data;
+            } catch (e) {
+                console.log('processed images error', e);
+            }
+        }
+
+        async function showProcessedImage(rawFilename) {
+            // Convert raw filename to processed filename
+            const base = rawFilename.replace(/\.[^/.]+$/, "");
+            const processedName = `${base}_sam3.png`;
+            
+            const display = document.getElementById('processedDisplay');
+            
+            // Check if processed version exists
+            const res = await fetch(`/uploads/processed/${processedName}`);
+            
+            if (res.ok) {
+                display.innerHTML = `
+                    <img src="/uploads/processed/${processedName}" 
+                         class="processed-image-display" 
+                         alt="Processed ${rawFilename}">
+                `;
+            } else {
+                display.innerHTML = `
+                    <div style="text-align: center;">
+                        <p style="font-size: 18px; margin-bottom: 12px;">📷 ${rawFilename}</p>
+                        <img src="/uploads/raw/${rawFilename}" 
+                             style="max-width: 80%; max-height: 60vh; border-radius: 8px; margin-bottom: 16px;"
+                             alt="${rawFilename}">
+                        <p style="font-size: 14px; color: #6b7280;">Not processed yet - click "Process" button to analyze</p>
+                    </div>
+                `;
+            }
         }
 
         async function deleteImage(filename, btn) {
@@ -565,7 +848,7 @@
             ordered.forEach((item, idx) => {
                 const imgName = item.image;
                 const dets = item.detections || [];
-                const imgUrl = `/uploads/${imgName}`;
+                const imgUrl = `/uploads/processed/${imgName}`;
                 const uniqueLabels = [...new Set(dets.map(d => d.label || d.type))];
 
                 const title = idx === 0
@@ -573,7 +856,8 @@
                     : `Zdjęcie #${idx + 1}`;
 
                 html += `
-                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px; cursor: pointer;"
+                         onclick="showProcessedImageByName('${imgName}')">
                         <img src="${imgUrl}"
                              alt="Detections preview"
                              style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;">
@@ -592,9 +876,171 @@
             detectionsPreview.innerHTML = html;
         }
 
+        function showProcessedImageByName(processedName) {
+            // Switch to processed photos tab
+            switchTab('processed');
+            
+            const display = document.getElementById('processedDisplay');
+            display.innerHTML = `
+                <img src="/uploads/processed/${processedName}" 
+                     class="processed-image-display" 
+                     alt="Processed ${processedName}">
+            `;
+        }
+
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event?.target?.classList.add('active') || 
+                document.querySelector(`[onclick*="${tabName}"]`)?.classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+
+            // Load charts if switching to charts tab
+            if (tabName === 'charts') {
+                loadCharts();
+            }
+        }
+
+        async function loadCharts() {
+            // Fetch detection data
+            try {
+                const res = await fetch('/detections');
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                // Process data for charts
+                const objectCounts = {};
+                const timeline = [];
+                const confidences = [];
+
+                data.forEach(item => {
+                    item.detections.forEach(det => {
+                        const label = det.label || det.type || 'unknown';
+                        objectCounts[label] = (objectCounts[label] || 0) + 1;
+                        
+                        if (det.score !== undefined) {
+                            confidences.push(det.score);
+                        }
+                    });
+
+                    if (item.timestamp) {
+                        timeline.push({
+                            time: new Date(item.timestamp),
+                            count: item.detections.length
+                        });
+                    }
+                });
+
+                // Simple chart rendering (you can integrate Chart.js for better charts)
+                renderSimpleBarChart('detectionChart', objectCounts);
+                renderSimpleTimelineChart('timelineChart', timeline);
+                renderSimpleHistogram('confidenceChart', confidences);
+            } catch (e) {
+                console.log('Error loading chart data:', e);
+            }
+        }
+
+        function renderSimpleBarChart(canvasId, data) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const labels = Object.keys(data);
+            const values = Object.values(data);
+            
+            if (labels.length === 0) {
+                canvas.parentElement.innerHTML += '<p style="text-align:center;color:#6b7280;margin-top:20px;">No data yet</p>';
+                return;
+            }
+
+            // Simple text display for now
+            let html = '<div style="padding: 12px;">';
+            labels.forEach((label, i) => {
+                const percentage = (values[i] / Math.max(...values)) * 100;
+                html += `
+                    <div style="margin-bottom: 12px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <span style="font-size: 13px; font-weight: 500;">${label}</span>
+                            <span style="font-size: 13px; color: #2563eb; font-weight: 600;">${values[i]}</span>
+                        </div>
+                        <div style="background: #e5e7eb; height: 8px; border-radius: 4px; overflow: hidden;">
+                            <div style="background: #2563eb; height: 100%; width: ${percentage}%; transition: width 0.3s;"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            canvas.parentElement.innerHTML = `<h3>Object Detection Summary</h3>${html}`;
+        }
+
+        function renderSimpleTimelineChart(canvasId, timeline) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+
+            if (timeline.length === 0) {
+                canvas.parentElement.innerHTML += '<p style="text-align:center;color:#6b7280;margin-top:20px;">No timeline data</p>';
+                return;
+            }
+
+            let html = '<div style="padding: 12px;">';
+            timeline.sort((a, b) => a.time - b.time).forEach(item => {
+                const timeStr = item.time.toLocaleDateString() + ' ' + item.time.toLocaleTimeString();
+                html += `
+                    <div style="margin-bottom: 8px; padding: 8px; background: white; border-radius: 6px; border-left: 3px solid #2563eb;">
+                        <div style="font-size: 12px; color: #6b7280;">${timeStr}</div>
+                        <div style="font-size: 14px; font-weight: 600; color: #1a1a1a;">${item.count} objects detected</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            canvas.parentElement.innerHTML = `<h3>Processing Timeline</h3>${html}`;
+        }
+
+        function renderSimpleHistogram(canvasId, confidences) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+
+            if (confidences.length === 0) {
+                canvas.parentElement.innerHTML += '<p style="text-align:center;color:#6b7280;margin-top:20px;">No confidence data</p>';
+                return;
+            }
+
+            const avg = confidences.reduce((a, b) => a + b, 0) / confidences.length;
+            const min = Math.min(...confidences);
+            const max = Math.max(...confidences);
+
+            let html = `
+                <div style="padding: 20px; text-align: center;">
+                    <div style="font-size: 42px; font-weight: 700; color: #2563eb; margin-bottom: 8px;">
+                        ${(avg * 100).toFixed(1)}%
+                    </div>
+                    <div style="color: #6b7280; margin-bottom: 20px;">Average Confidence</div>
+                    <div style="display: flex; justify-content: space-around; margin-top: 16px;">
+                        <div>
+                            <div style="font-size: 24px; font-weight: 600; color: #16a34a;">${(max * 100).toFixed(1)}%</div>
+                            <div style="font-size: 12px; color: #6b7280;">Max</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 24px; font-weight: 600; color: #dc2626;">${(min * 100).toFixed(1)}%</div>
+                            <div style="font-size: 12px; color: #6b7280;">Min</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            canvas.parentElement.innerHTML = `<h3>Detection Confidence</h3>${html}`;
+        }
+
         // Initial load of images & detections
         fetchImages();
         fetchDetections();
+        fetchProcessedImages();
 
         // ─────────────────────────────────────────
         // Chatbot (mock)
