@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Construction AI Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f5f7fa;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            grid-template-columns: 1fr 380px; /* main + chatbot */
+            min-height: 100vh;
+        }
+        h1 {
+            text-align: center;
+            font-weight: 700;
+            margin-bottom: 40px;
+            color: #1a1a1a;
+        }
+        .main-content {
+            padding: 24px 32px;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: 280px 1fr; /* sidebar cards + map */
+            gap: 24px;
+            align-items: start;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .card h2 {
+            margin: 0 0 8px 0;
+            font-weight: 600;
+            font-size: 16px;
+        }
+                /* Sidebar for compact cards */
+                .sidebar {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                }
+
+                /* Drag & Drop upload */
+                .upload-card {
+                    border: 2px dashed #c7d2fe;
+                    background: #f8fafc;
+                }
+                .upload-area {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    color: #475569;
+                    padding: 16px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                }
+                .upload-area.hover {
+                    background: #eef2ff;
+                }
+                .upload-hint {
+                    font-size: 12px;
+                    color: #6b7280;
+                    margin-top: 6px;
+                }
+                /* Images card */
+                .images-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+                    gap: 8px;
+                }
+                .images-grid img {
+                    width: 100%;
+                    aspect-ratio: 4/3;
+                    object-fit: cover;
+                    border-radius: 8px;
+                    border: 1px solid #e5e7eb;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+                    transition: transform .15s ease;
+                }
+                .images-grid img:hover { transform: scale(1.05); }
+                .thumb-wrapper { position: relative; }
+                .delete-btn {
+                    position: absolute;
+                    top: 4px;
+                    right: 4px;
+                    background: rgba(0,0,0,0.55);
+                    color: #fff;
+                    border: none;
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    line-height: 22px;
+                    text-align: center;
+                    padding: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: background .15s;
+                }
+                .delete-btn:hover { background: rgba(220,38,38,0.85); }
+
+                /* Map container centered */
+                .map-container {
+                    background: white;
+                    border-radius: 16px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+                    padding: 16px;
+                    height: calc(100vh - 80px);
+                }
+                .map-title {
+                    margin: 0 0 12px 0;
+                    font-size: 20px;
+                    font-weight: 700;
+                    color: #1a1a1a;
+                    text-align: left;
+                }
+                .map-canvas {
+                    height: calc(100% - 36px);
+                    border-radius: 12px;
+                    background: #eef2ff;
+                    border: 1px solid #e5e7eb;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #6b7280;
+                    font-weight: 500;
+                }
+
+                .btn-row {
+                    display: flex;
+                    gap: 8px;
+                }
+
+        .btn {
+            background: #2563eb;
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 10px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+        }
+        .btn:hover {
+            background: #1e4fcc;
+        }
+        
+        /* AI Chatbot Side Panel */
+        .chatbot-panel {
+            width: 360px;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #e5e7eb;
+            border-right: none; /* flush with edge */
+            border-radius: 16px 0 0 16px; /* rounded like cards on exposed edges */
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            overflow: hidden; /* round header corners */
+            margin: 16px 16px 16px 0; /* breathing space */
+        }
+        .chatbot-header {
+            padding: 18px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .chatbot-header h2 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .chatbot-header p {
+            margin: 5px 0 0 0;
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 18px 20px 12px 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: #ffffff;
+        }
+        .message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .message.user {
+            background: #2563eb;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        .message.bot {
+            background: #f3f4f6;
+            color: #1a1a1a;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        .chat-input-container {
+            padding: 16px 20px 18px 20px;
+            border-top: 1px solid #e5e7eb;
+            background: #f8fafc;
+        }
+        .chat-input-wrapper {
+            display: flex;
+            gap: 10px;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .chat-input:focus {
+            border-color: #2563eb;
+        }
+        .chat-send-btn {
+            background: #2563eb;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .chat-send-btn:hover {
+            background: #1e4fcc;
+        }
+        .chat-send-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .typing-indicator {
+            display: none;
+            align-self: flex-start;
+            padding: 12px 16px;
+            background: #f3f4f6;
+            border-radius: 12px;
+            border-bottom-left-radius: 4px;
+        }
+        .typing-indicator.active {
+            display: block;
+        }
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #9ca3af;
+            margin: 0 2px;
+            animation: typing 1.4s infinite;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+            }
+            30% {
+                transform: translateY(-10px);
+            }
+        }
+        
+        @media (max-width: 1024px) {
+            body {
+                flex-direction: column;
+            }
+            .chatbot-panel {
+                width: 100%;
+                border: 1px solid #e5e7eb;
+                border-radius: 16px;
+                margin: 12px;
+                max-height: 420px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-content">
+        <!-- Top label/title
+        <div style="grid-column: 1 / -1; margin: 4px 0 8px 0;">
+            <h1 style="text-align:left; margin:0;">Construction Monitoring</h1>
+        </div> -->
+        <!-- Right sidebar with compact cards -->
+        <div class="sidebar">
+            <div class="card upload-card" id="uploadCard">
+                <h2>Dodaj zdjęcia</h2>
+                <div class="upload-area" id="uploadArea">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 16V8M12 8L8.5 11.5M12 8L15.5 11.5" stroke="#2563eb" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M20 16.5C20 18.9853 17.9853 21 15.5 21H8.5C6.01472 21 4 18.9853 4 16.5" stroke="#2563eb" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span>Przeciągnij i upuść pliki lub kliknij</span>
+                </div>
+                <input type="file" id="fileInput" multiple accept="image/*" style="display:none" />
+                <div class="upload-hint">Obsługiwane formaty: JPG, PNG, TIFF</div>
+            </div>
+            <div class="card" id="imagesCard">
+                <h2>Zdjęcia</h2>
+                <div id="imagesThumbs" class="images-grid"><div style="font-size:12px;color:#6b7280;grid-column:1/-1">Brak zdjęć</div></div>
+            </div>
+            <div class="card">
+                <h2>Detected Objects</h2>
+                <div class="btn-row">
+                    <a class="btn" href="/detections">Open</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Project Progress</h2>
+                <div class="btn-row">
+                    <a class="btn" href="/progress">Open</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Generate Report</h2>
+                <div class="btn-row">
+                    <a class="btn" href="/report">Generate</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center map -->
+        <div class="map-container">
+            <h2 class="map-title">Site Map</h2>
+            <div class="map-canvas">
+                Map placeholder — integrate Leaflet/Mapbox here
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Chatbot Side Panel -->
+    <div class="chatbot-panel">
+        <div class="chatbot-header">
+            <h2>🤖 AI Assistant</h2>
+            <p>Ask me about your construction project</p>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages">
+            <div class="message bot">
+                Witaj! Jestem Twoim asystentem AI. Mogę pomóc Ci z:
+                <br>• Analizą wykrytych obiektów
+                <br>• Postępem budowy
+                <br>• Generowaniem raportów
+                <br><br>Jak mogę Ci pomóc?
+            </div>
+        </div>
+        
+        <div class="typing-indicator" id="typingIndicator">
+            <span></span><span></span><span></span>
+        </div>
+        
+        <div class="chat-input-container">
+            <div class="chat-input-wrapper">
+                <input 
+                    type="text" 
+                    class="chat-input" 
+                    id="chatInput" 
+                    placeholder="Wpisz wiadomość..."
+                    onkeypress="handleKeyPress(event)"
+                />
+                <button class="chat-send-btn" onclick="sendMessage()">Wyślij</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const typingIndicator = document.getElementById('typingIndicator');
+
+        // Drag & Drop upload logic
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const uploadCard = document.getElementById('uploadCard');
+        const imagesThumbs = document.getElementById('imagesThumbs');
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter','dragover','dragleave','drop'].forEach(eventName => {
+            uploadCard.addEventListener(eventName, preventDefaults, false);
+        });
+
+        ['dragenter','dragover'].forEach(eventName => {
+            uploadCard.addEventListener(eventName, () => uploadArea.classList.add('hover'), false);
+        });
+        ['dragleave','drop'].forEach(eventName => {
+            uploadCard.addEventListener(eventName, () => uploadArea.classList.remove('hover'), false);
+        });
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadCard.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        async function handleFiles(files) {
+            if (!files || files.length === 0) return;
+            const formData = new FormData();
+            for (const file of files) {
+                formData.append('files', file);
+            }
+            try {
+                const res = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!res.ok) throw new Error('Upload failed');
+                addMessage('✅ Przesłano zdjęcia pomyślnie.', false);
+                await fetchImages();
+            } catch (err) {
+                addMessage('❌ Błąd przesyłania zdjęć.', false);
+            }
+        }
+
+        async function fetchImages() {
+            try {
+                const res = await fetch('/images');
+                if (!res.ok) return;
+                const data = await res.json();
+                renderImages(data);
+            } catch (e) {
+                // ignore fetch errors
+            }
+        }
+
+        function renderImages(list) {
+            imagesThumbs.innerHTML = '';
+            if (!list.length) {
+                imagesThumbs.innerHTML = '<div style="font-size:12px;color:#6b7280;grid-column:1/-1">Brak zdjęć</div>';
+                return;
+            }
+            list.forEach(name => {
+                const wrap = document.createElement('div');
+                wrap.className = 'thumb-wrapper';
+                const img = document.createElement('img');
+                img.src = `/uploads/${name}`;
+                img.alt = name;
+                img.title = name;
+                const del = document.createElement('button');
+                del.className = 'delete-btn';
+                del.type = 'button';
+                del.textContent = '×';
+                del.title = 'Usuń';
+                del.addEventListener('click', () => deleteImage(name, del));
+                wrap.appendChild(img);
+                wrap.appendChild(del);
+                imagesThumbs.appendChild(wrap);
+            });
+        }
+
+        async function deleteImage(filename, btn) {
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            try {
+                const res = await fetch(`/images/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error();
+                await fetchImages();
+                addMessage(`🗑️ Usunięto ${filename}`, false);
+            } catch (e) {
+                addMessage(`❌ Błąd usuwania ${filename}`, false);
+            } finally {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        }
+
+        // Initial load of images
+        fetchImages();
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function addMessage(text, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+            messageDiv.textContent = text;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function showTyping() {
+            typingIndicator.classList.add('active');
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function hideTyping() {
+            typingIndicator.classList.remove('active');
+        }
+
+        async function sendMessage() {
+            const message = chatInput.value.trim();
+            if (!message) return;
+
+            // Add user message
+            addMessage(message, true);
+            chatInput.value = '';
+
+            // Show typing indicator
+            showTyping();
+
+            // Simulate AI response (replace with actual API call)
+            setTimeout(() => {
+                hideTyping();
+                const responses = [
+                    'Na podstawie danych wykryłem 2 koparki i 1 dźwig na budowie.',
+                    'Postęp projektu wynosi obecnie 42%. Trwają prace ziemne.',
+                    'Czy chcesz, żebym wygenerował szczegółowy raport?',
+                    'Mogę przeanalizować zdjęcia z budowy. Prześlij je, a opowiem Ci co widzę.',
+                    'Zauważyłem wzrost aktywności maszyn w ciągu ostatnich 3 dni.'
+                ];
+                const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+                addMessage(randomResponse);
+            }, 1000 + Math.random() * 1000);
+        }
+
+        // Auto-scroll to bottom on load
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    </script>
+</body>
+</html>
