@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Construction AI Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f5f7fa;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            grid-template-columns: 1fr 380px; /* main + chatbot */
+            min-height: 100vh;
+        }
+        h1 {
+            text-align: center;
+            font-weight: 700;
+            margin-bottom: 40px;
+            color: #1a1a1a;
+        }
+        .main-content {
+            padding: 24px 32px;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: 280px 1fr; /* sidebar cards + map */
+            gap: 24px;
+            align-items: start;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .card h2 {
+            margin: 0 0 8px 0;
+            font-weight: 600;
+            font-size: 16px;
+        }
+                /* Sidebar for compact cards */
+                .sidebar {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                }
+
+                /* Map container centered */
+                .map-container {
+                    background: white;
+                    border-radius: 16px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+                    padding: 16px;
+                    height: calc(100vh - 80px);
+                }
+                .map-title {
+                    margin: 0 0 12px 0;
+                    font-size: 20px;
+                    font-weight: 700;
+                    color: #1a1a1a;
+                    text-align: left;
+                }
+                .map-canvas {
+                    height: calc(100% - 36px);
+                    border-radius: 12px;
+                    background: #eef2ff;
+                    border: 1px solid #e5e7eb;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #6b7280;
+                    font-weight: 500;
+                }
+
+                .btn-row {
+                    display: flex;
+                    gap: 8px;
+                }
+
+        .btn {
+            background: #2563eb;
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 10px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+        }
+        .btn:hover {
+            background: #1e4fcc;
+        }
+        
+        /* AI Chatbot Side Panel */
+        .chatbot-panel {
+            width: 380px;
+            background: white;
+            border-left: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -4px 0 12px rgba(0,0,0,0.05);
+        }
+        .chatbot-header {
+            padding: 20px;
+            border-bottom: 1px solid #e5e7eb;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .chatbot-header h2 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .chatbot-header p {
+            margin: 5px 0 0 0;
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .message.user {
+            background: #2563eb;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        .message.bot {
+            background: #f3f4f6;
+            color: #1a1a1a;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        .chat-input-container {
+            padding: 20px;
+            border-top: 1px solid #e5e7eb;
+            background: #fafafa;
+        }
+        .chat-input-wrapper {
+            display: flex;
+            gap: 10px;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .chat-input:focus {
+            border-color: #2563eb;
+        }
+        .chat-send-btn {
+            background: #2563eb;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .chat-send-btn:hover {
+            background: #1e4fcc;
+        }
+        .chat-send-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .typing-indicator {
+            display: none;
+            align-self: flex-start;
+            padding: 12px 16px;
+            background: #f3f4f6;
+            border-radius: 12px;
+            border-bottom-left-radius: 4px;
+        }
+        .typing-indicator.active {
+            display: block;
+        }
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #9ca3af;
+            margin: 0 2px;
+            animation: typing 1.4s infinite;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+            }
+            30% {
+                transform: translateY(-10px);
+            }
+        }
+        
+        @media (max-width: 1024px) {
+            body {
+                flex-direction: column;
+            }
+            .chatbot-panel {
+                width: 100%;
+                border-left: none;
+                border-top: 1px solid #e5e7eb;
+                max-height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-content">
+        <!-- Right sidebar with compact cards -->
+        <div class="sidebar">
+            <div class="card">
+                <h2>Detected Objects</h2>
+                <div class="btn-row">
+                    <a class="btn" href="/detections">Open</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Project Progress</h2>
+                <div class="btn-row">
+                    <a class="btn" href="/progress">Open</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Generate Report</h2>
+                <div class="btn-row">
+                    <a class="btn" href="/report">Generate</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center map -->
+        <div class="map-container">
+            <h2 class="map-title">Site Map</h2>
+            <div class="map-canvas">
+                Map placeholder — integrate Leaflet/Mapbox here
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Chatbot Side Panel -->
+    <div class="chatbot-panel">
+        <div class="chatbot-header">
+            <h2>🤖 AI Assistant</h2>
+            <p>Ask me about your construction project</p>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages">
+            <div class="message bot">
+                Witaj! Jestem Twoim asystentem AI. Mogę pomóc Ci z:
+                <br>• Analizą wykrytych obiektów
+                <br>• Postępem budowy
+                <br>• Generowaniem raportów
+                <br><br>Jak mogę Ci pomóc?
+            </div>
+        </div>
+        
+        <div class="typing-indicator" id="typingIndicator">
+            <span></span><span></span><span></span>
+        </div>
+        
+        <div class="chat-input-container">
+            <div class="chat-input-wrapper">
+                <input 
+                    type="text" 
+                    class="chat-input" 
+                    id="chatInput" 
+                    placeholder="Wpisz wiadomość..."
+                    onkeypress="handleKeyPress(event)"
+                />
+                <button class="chat-send-btn" onclick="sendMessage()">Wyślij</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const typingIndicator = document.getElementById('typingIndicator');
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function addMessage(text, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+            messageDiv.textContent = text;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function showTyping() {
+            typingIndicator.classList.add('active');
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function hideTyping() {
+            typingIndicator.classList.remove('active');
+        }
+
+        async function sendMessage() {
+            const message = chatInput.value.trim();
+            if (!message) return;
+
+            // Add user message
+            addMessage(message, true);
+            chatInput.value = '';
+
+            // Show typing indicator
+            showTyping();
+
+            // Simulate AI response (replace with actual API call)
+            setTimeout(() => {
+                hideTyping();
+                const responses = [
+                    'Na podstawie danych wykryłem 2 koparki i 1 dźwig na budowie.',
+                    'Postęp projektu wynosi obecnie 42%. Trwają prace ziemne.',
+                    'Czy chcesz, żebym wygenerował szczegółowy raport?',
+                    'Mogę przeanalizować zdjęcia z budowy. Prześlij je, a opowiem Ci co widzę.',
+                    'Zauważyłem wzrost aktywności maszyn w ciągu ostatnich 3 dni.'
+                ];
+                const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+                addMessage(randomResponse);
+            }, 1000 + Math.random() * 1000);
+        }
+
+        // Auto-scroll to bottom on load
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    </script>
+</body>
+</html>
