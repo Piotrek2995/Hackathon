@@ -53,106 +53,106 @@
             font-weight: 600;
             font-size: 16px;
         }
-                /* Sidebar for compact cards */
-                .sidebar {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 12px;
-                }
+        /* Sidebar for compact cards */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
 
-                /* Drag & Drop upload */
-                .upload-card {
-                    border: 2px dashed #c7d2fe;
-                    background: #f8fafc;
-                }
-                .upload-area {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 8px;
-                    color: #475569;
-                    padding: 16px;
-                    border-radius: 8px;
-                    cursor: pointer;
-                }
-                .upload-area.hover {
-                    background: #eef2ff;
-                }
-                .upload-hint {
-                    font-size: 12px;
-                    color: #6b7280;
-                    margin-top: 6px;
-                }
-                /* Images card */
-                .images-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
-                    gap: 8px;
-                }
-                .images-grid img {
-                    width: 100%;
-                    aspect-ratio: 4/3;
-                    object-fit: cover;
-                    border-radius: 8px;
-                    border: 1px solid #e5e7eb;
-                    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
-                    transition: transform .15s ease;
-                }
-                .images-grid img:hover { transform: scale(1.05); }
-                .thumb-wrapper { position: relative; }
-                .delete-btn {
-                    position: absolute;
-                    top: 4px;
-                    right: 4px;
-                    background: rgba(0,0,0,0.55);
-                    color: #fff;
-                    border: none;
-                    width: 22px;
-                    height: 22px;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    font-size: 14px;
-                    line-height: 22px;
-                    text-align: center;
-                    padding: 0;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    transition: background .15s;
-                }
-                .delete-btn:hover { background: rgba(220,38,38,0.85); }
+        /* Drag & Drop upload */
+        .upload-card {
+            border: 2px dashed #c7d2fe;
+            background: #f8fafc;
+        }
+        .upload-area {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: #475569;
+            padding: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .upload-area.hover {
+            background: #eef2ff;
+        }
+        .upload-hint {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 6px;
+        }
+        /* Images card */
+        .images-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+            gap: 8px;
+        }
+        .images-grid img {
+            width: 100%;
+            aspect-ratio: 4/3;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+            transition: transform .15s ease;
+        }
+        .images-grid img:hover { transform: scale(1.05); }
+        .thumb-wrapper { position: relative; }
+        .delete-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: rgba(0,0,0,0.55);
+            color: #fff;
+            border: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 22px;
+            text-align: center;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background .15s;
+        }
+        .delete-btn:hover { background: rgba(220,38,38,0.85); }
 
-                /* Map container centered */
-                .map-container {
-                    background: white;
-                    border-radius: 16px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-                    padding: 16px;
-                    height: calc(100vh - 80px);
-                }
-                .map-title {
-                    margin: 0 0 12px 0;
-                    font-size: 20px;
-                    font-weight: 700;
-                    color: #1a1a1a;
-                    text-align: left;
-                }
-                .map-canvas {
-                    height: calc(100% - 36px);
-                    border-radius: 12px;
-                    background: #eef2ff;
-                    border: 1px solid #e5e7eb;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: #6b7280;
-                    font-weight: 500;
-                }
+        /* Map container centered */
+        .map-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            padding: 16px;
+            height: calc(100vh - 80px);
+        }
+        .map-title {
+            margin: 0 0 12px 0;
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a1a;
+            text-align: left;
+        }
+        .map-canvas {
+            height: calc(100% - 36px);
+            border-radius: 12px;
+            background: #eef2ff;
+            border: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6b7280;
+            font-weight: 500;
+        }
 
-                .btn-row {
-                    display: flex;
-                    gap: 8px;
-                }
+        .btn-row {
+            display: flex;
+            gap: 8px;
+        }
 
         .btn {
             background: #2563eb;
@@ -169,7 +169,7 @@
         .btn:hover {
             background: #1e4fcc;
         }
-        
+
         /* AI Chatbot Side Panel */
         .chatbot-panel {
             width: 360px;
@@ -311,7 +311,7 @@
                 transform: translateY(-10px);
             }
         }
-        
+
         @media (max-width: 1024px) {
             body {
                 flex-direction: column;
@@ -328,10 +328,6 @@
 </head>
 <body>
     <div class="main-content">
-        <!-- Top label/title
-        <div style="grid-column: 1 / -1; margin: 4px 0 8px 0;">
-            <h1 style="text-align:left; margin:0;">Construction Monitoring</h1>
-        </div> -->
         <!-- Right sidebar with compact cards -->
         <div class="sidebar">
             <div class="card upload-card" id="uploadCard">
@@ -348,26 +344,31 @@
             </div>
             <div class="card" id="imagesCard">
                 <h2>Zdjęcia</h2>
-                <div id="imagesThumbs" class="images-grid"><div style="font-size:12px;color:#6b7280;grid-column:1/-1">Brak zdjęć</div></div>
+                <div id="imagesThumbs" class="images-grid">
+                    <div style="font-size:12px;color:#6b7280;grid-column:1/-1">Brak zdjęć</div>
+                </div>
             </div>
             <div class="card">
                 <h2>Detected Objects</h2>
+                <div id="detectionsPreview" style="margin-bottom:10px;font-size:12px;color:#6b7280;">
+                    Brak danych
+                </div>
                 <div class="btn-row">
-                    <a class="btn" href="/detections">Open</a>
+                    <a class="btn" href="/detections" target="_blank">Open JSON</a>
                 </div>
             </div>
 
             <div class="card">
                 <h2>Project Progress</h2>
                 <div class="btn-row">
-                    <a class="btn" href="/progress">Open</a>
+                    <a class="btn" href="/progress" target="_blank">Open</a>
                 </div>
             </div>
 
             <div class="card">
                 <h2>Generate Report</h2>
                 <div class="btn-row">
-                    <a class="btn" href="/report">Generate</a>
+                    <a class="btn" href="/report" target="_blank">Generate</a>
                 </div>
             </div>
         </div>
@@ -387,7 +388,7 @@
             <h2>🤖 AI Assistant</h2>
             <p>Ask me about your construction project</p>
         </div>
-        
+
         <div class="chat-messages" id="chatMessages">
             <div class="message bot">
                 Witaj! Jestem Twoim asystentem AI. Mogę pomóc Ci z:
@@ -397,17 +398,17 @@
                 <br><br>Jak mogę Ci pomóc?
             </div>
         </div>
-        
+
         <div class="typing-indicator" id="typingIndicator">
             <span></span><span></span><span></span>
         </div>
-        
+
         <div class="chat-input-container">
             <div class="chat-input-wrapper">
-                <input 
-                    type="text" 
-                    class="chat-input" 
-                    id="chatInput" 
+                <input
+                    type="text"
+                    class="chat-input"
+                    id="chatInput"
                     placeholder="Wpisz wiadomość..."
                     onkeypress="handleKeyPress(event)"
                 />
@@ -426,6 +427,7 @@
         const fileInput = document.getElementById('fileInput');
         const uploadCard = document.getElementById('uploadCard');
         const imagesThumbs = document.getElementById('imagesThumbs');
+        const detectionsPreview = document.getElementById('detectionsPreview');
 
         function preventDefaults(e) {
             e.preventDefault();
@@ -468,6 +470,7 @@
                 if (!res.ok) throw new Error('Upload failed');
                 addMessage('✅ Przesłano zdjęcia pomyślnie.', false);
                 await fetchImages();
+                await fetchDetections();
             } catch (err) {
                 addMessage('❌ Błąd przesyłania zdjęć.', false);
             }
@@ -487,22 +490,26 @@
         function renderImages(list) {
             imagesThumbs.innerHTML = '';
             if (!list.length) {
-                imagesThumbs.innerHTML = '<div style="font-size:12px;color:#6b7280;grid-column:1/-1">Brak zdjęć</div>';
+                imagesThumbs.innerHTML =
+                    '<div style="font-size:12px;color:#6b7280;grid-column:1/-1">Brak zdjęć</div>';
                 return;
             }
             list.forEach(name => {
                 const wrap = document.createElement('div');
                 wrap.className = 'thumb-wrapper';
+
                 const img = document.createElement('img');
                 img.src = `/uploads/${name}`;
                 img.alt = name;
                 img.title = name;
+
                 const del = document.createElement('button');
                 del.className = 'delete-btn';
                 del.type = 'button';
                 del.textContent = '×';
                 del.title = 'Usuń';
                 del.addEventListener('click', () => deleteImage(name, del));
+
                 wrap.appendChild(img);
                 wrap.appendChild(del);
                 imagesThumbs.appendChild(wrap);
@@ -517,6 +524,7 @@
                 if (!res.ok) throw new Error();
                 await fetchImages();
                 addMessage(`🗑️ Usunięto ${filename}`, false);
+                await fetchDetections();
             } catch (e) {
                 addMessage(`❌ Błąd usuwania ${filename}`, false);
             } finally {
@@ -525,9 +533,72 @@
             }
         }
 
-        // Initial load of images
-        fetchImages();
+        // ─────────────────────────────────────────
+        // Detections preview – wszystkie zdjęcia, ostatnie na górze
+        // ─────────────────────────────────────────
+        async function fetchDetections() {
+            try {
+                const res = await fetch('/detections');
+                if (!res.ok) return;
+                const data = await res.json();
+                renderDetectionsPreview(data);
+            } catch (e) {
+                console.log('detections error', e);
+            }
+        }
 
+        function renderDetectionsPreview(list) {
+            if (!detectionsPreview) return;
+
+            if (!list || !list.length) {
+                detectionsPreview.innerHTML =
+                    '<div style="font-size:12px;color:#6b7280;">Brak danych</div>';
+                return;
+            }
+
+            // backend już zwraca najnowsze jako pierwsze,
+            // ale robimy kopię na wszelki wypadek
+            const ordered = [...list];
+
+            let html = '';
+
+            ordered.forEach((item, idx) => {
+                const imgName = item.image;
+                const dets = item.detections || [];
+                const imgUrl = `/uploads/${imgName}`;
+                const uniqueLabels = [...new Set(dets.map(d => d.label || d.type))];
+
+                const title = idx === 0
+                    ? 'Ostatnie przetworzone zdjęcie'
+                    : `Zdjęcie #${idx + 1}`;
+
+                html += `
+                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                        <img src="${imgUrl}"
+                             alt="Detections preview"
+                             style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;">
+                        <div>
+                            <div style="font-size:13px;font-weight:500;">${title}</div>
+                            <div style="font-size:12px;color:#6b7280;">Plik: ${imgName}</div>
+                            <div style="font-size:12px;color:#6b7280;">Obiektów: ${dets.length}</div>
+                            <div style="font-size:12px;color:#6b7280;">
+                                Klasy: ${uniqueLabels.length ? uniqueLabels.join(', ') : 'brak'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            detectionsPreview.innerHTML = html;
+        }
+
+        // Initial load of images & detections
+        fetchImages();
+        fetchDetections();
+
+        // ─────────────────────────────────────────
+        // Chatbot (mock)
+        // ─────────────────────────────────────────
         function handleKeyPress(event) {
             if (event.key === 'Enter') {
                 sendMessage();
@@ -555,14 +626,11 @@
             const message = chatInput.value.trim();
             if (!message) return;
 
-            // Add user message
             addMessage(message, true);
             chatInput.value = '';
 
-            // Show typing indicator
             showTyping();
 
-            // Simulate AI response (replace with actual API call)
             setTimeout(() => {
                 hideTyping();
                 const responses = [
