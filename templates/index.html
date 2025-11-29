@@ -60,6 +60,68 @@
                     gap: 12px;
                 }
 
+                /* Drag & Drop upload */
+                .upload-card {
+                    border: 2px dashed #c7d2fe;
+                    background: #f8fafc;
+                }
+                .upload-area {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    color: #475569;
+                    padding: 16px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                }
+                .upload-area.hover {
+                    background: #eef2ff;
+                }
+                .upload-hint {
+                    font-size: 12px;
+                    color: #6b7280;
+                    margin-top: 6px;
+                }
+                /* Images card */
+                .images-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+                    gap: 8px;
+                }
+                .images-grid img {
+                    width: 100%;
+                    aspect-ratio: 4/3;
+                    object-fit: cover;
+                    border-radius: 8px;
+                    border: 1px solid #e5e7eb;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+                    transition: transform .15s ease;
+                }
+                .images-grid img:hover { transform: scale(1.05); }
+                .thumb-wrapper { position: relative; }
+                .delete-btn {
+                    position: absolute;
+                    top: 4px;
+                    right: 4px;
+                    background: rgba(0,0,0,0.55);
+                    color: #fff;
+                    border: none;
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    line-height: 22px;
+                    text-align: center;
+                    padding: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: background .15s;
+                }
+                .delete-btn:hover { background: rgba(220,38,38,0.85); }
+
                 /* Map container centered */
                 .map-container {
                     background: white;
@@ -110,15 +172,19 @@
         
         /* AI Chatbot Side Panel */
         .chatbot-panel {
-            width: 380px;
+            width: 360px;
             background: white;
-            border-left: 1px solid #e5e7eb;
             display: flex;
             flex-direction: column;
-            box-shadow: -4px 0 12px rgba(0,0,0,0.05);
+            border: 1px solid #e5e7eb;
+            border-right: none; /* flush with edge */
+            border-radius: 16px 0 0 16px; /* rounded like cards on exposed edges */
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            overflow: hidden; /* round header corners */
+            margin: 16px 16px 16px 0; /* breathing space */
         }
         .chatbot-header {
-            padding: 20px;
+            padding: 18px 20px;
             border-bottom: 1px solid #e5e7eb;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -135,11 +201,12 @@
         }
         .chat-messages {
             flex: 1;
-            padding: 20px;
+            padding: 18px 20px 12px 20px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 12px;
+            background: #ffffff;
         }
         .message {
             max-width: 85%;
@@ -172,9 +239,9 @@
             border-bottom-left-radius: 4px;
         }
         .chat-input-container {
-            padding: 20px;
+            padding: 16px 20px 18px 20px;
             border-top: 1px solid #e5e7eb;
-            background: #fafafa;
+            background: #f8fafc;
         }
         .chat-input-wrapper {
             display: flex;
@@ -251,17 +318,38 @@
             }
             .chatbot-panel {
                 width: 100%;
-                border-left: none;
-                border-top: 1px solid #e5e7eb;
-                max-height: 400px;
+                border: 1px solid #e5e7eb;
+                border-radius: 16px;
+                margin: 12px;
+                max-height: 420px;
             }
         }
     </style>
 </head>
 <body>
     <div class="main-content">
+        <!-- Top label/title
+        <div style="grid-column: 1 / -1; margin: 4px 0 8px 0;">
+            <h1 style="text-align:left; margin:0;">Construction Monitoring</h1>
+        </div> -->
         <!-- Right sidebar with compact cards -->
         <div class="sidebar">
+            <div class="card upload-card" id="uploadCard">
+                <h2>Dodaj zdjęcia</h2>
+                <div class="upload-area" id="uploadArea">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 16V8M12 8L8.5 11.5M12 8L15.5 11.5" stroke="#2563eb" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M20 16.5C20 18.9853 17.9853 21 15.5 21H8.5C6.01472 21 4 18.9853 4 16.5" stroke="#2563eb" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span>Przeciągnij i upuść pliki lub kliknij</span>
+                </div>
+                <input type="file" id="fileInput" multiple accept="image/*" style="display:none" />
+                <div class="upload-hint">Obsługiwane formaty: JPG, PNG, TIFF</div>
+            </div>
+            <div class="card" id="imagesCard">
+                <h2>Zdjęcia</h2>
+                <div id="imagesThumbs" class="images-grid"><div style="font-size:12px;color:#6b7280;grid-column:1/-1">Brak zdjęć</div></div>
+            </div>
             <div class="card">
                 <h2>Detected Objects</h2>
                 <div class="btn-row">
@@ -332,6 +420,113 @@
         const chatMessages = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
         const typingIndicator = document.getElementById('typingIndicator');
+
+        // Drag & Drop upload logic
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const uploadCard = document.getElementById('uploadCard');
+        const imagesThumbs = document.getElementById('imagesThumbs');
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter','dragover','dragleave','drop'].forEach(eventName => {
+            uploadCard.addEventListener(eventName, preventDefaults, false);
+        });
+
+        ['dragenter','dragover'].forEach(eventName => {
+            uploadCard.addEventListener(eventName, () => uploadArea.classList.add('hover'), false);
+        });
+        ['dragleave','drop'].forEach(eventName => {
+            uploadCard.addEventListener(eventName, () => uploadArea.classList.remove('hover'), false);
+        });
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadCard.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        async function handleFiles(files) {
+            if (!files || files.length === 0) return;
+            const formData = new FormData();
+            for (const file of files) {
+                formData.append('files', file);
+            }
+            try {
+                const res = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!res.ok) throw new Error('Upload failed');
+                addMessage('✅ Przesłano zdjęcia pomyślnie.', false);
+                await fetchImages();
+            } catch (err) {
+                addMessage('❌ Błąd przesyłania zdjęć.', false);
+            }
+        }
+
+        async function fetchImages() {
+            try {
+                const res = await fetch('/images');
+                if (!res.ok) return;
+                const data = await res.json();
+                renderImages(data);
+            } catch (e) {
+                // ignore fetch errors
+            }
+        }
+
+        function renderImages(list) {
+            imagesThumbs.innerHTML = '';
+            if (!list.length) {
+                imagesThumbs.innerHTML = '<div style="font-size:12px;color:#6b7280;grid-column:1/-1">Brak zdjęć</div>';
+                return;
+            }
+            list.forEach(name => {
+                const wrap = document.createElement('div');
+                wrap.className = 'thumb-wrapper';
+                const img = document.createElement('img');
+                img.src = `/uploads/${name}`;
+                img.alt = name;
+                img.title = name;
+                const del = document.createElement('button');
+                del.className = 'delete-btn';
+                del.type = 'button';
+                del.textContent = '×';
+                del.title = 'Usuń';
+                del.addEventListener('click', () => deleteImage(name, del));
+                wrap.appendChild(img);
+                wrap.appendChild(del);
+                imagesThumbs.appendChild(wrap);
+            });
+        }
+
+        async function deleteImage(filename, btn) {
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            try {
+                const res = await fetch(`/images/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error();
+                await fetchImages();
+                addMessage(`🗑️ Usunięto ${filename}`, false);
+            } catch (e) {
+                addMessage(`❌ Błąd usuwania ${filename}`, false);
+            } finally {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        }
+
+        // Initial load of images
+        fetchImages();
 
         function handleKeyPress(event) {
             if (event.key === 'Enter') {
