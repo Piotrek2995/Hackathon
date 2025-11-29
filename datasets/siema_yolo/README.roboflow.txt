@@ -1,8 +1,8 @@
 
-Object Detection - v2 siema
+Object Detection - v3 siema
 ==============================
 
-This dataset was exported via roboflow.com on November 29, 2025 at 2:27 PM GMT
+This dataset was exported via roboflow.com on November 29, 2025 at 4:03 PM GMT
 
 Roboflow is an end-to-end computer vision platform that helps you
 * collaborate with your team on computer vision projects
@@ -17,12 +17,16 @@ visit https://github.com/roboflow/notebooks
 
 To find over 100k other datasets and pre-trained models, visit https://universe.roboflow.com
 
-The dataset includes 68 images.
+The dataset includes 337 images.
 Objects are annotated in YOLOv12 format.
 
 The following pre-processing was applied to each image:
 * Auto-orientation of pixel data (with EXIF-orientation stripping)
+* Resize to 1024x1024 (Stretch)
 
-No image augmentation techniques were applied.
+The following augmentation was applied to create 3 versions of each source image:
+* Random rotation of between -8 and +8 degrees
+* Random brigthness adjustment of between -10 and +10 percent
+* Random Gaussian blur of between 0 and 0.2 pixels
 
 

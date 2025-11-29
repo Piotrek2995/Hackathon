@@ -2,12 +2,12 @@ train: ../train/images
 val: ../valid/images
 test: ../test/images
 
-nc: 12
-names: ['betoniarka', 'bus', 'ciezarowka', 'kontener', 'koparka', 'pracownik', 'samochod_osobowy', 'spychacz', 'walec', 'wozek_widlowy', 'zuraw_mobilny', 'zuraw_wiezowy']
+nc: 10
+names: ['betoniarka', 'ciezarowka', 'kontener', 'koparka', 'pracownik', 'samochod_osobowy', 'spychacz', 'walec', 'zuraw_mobilny', 'zuraw_wiezowy']
 
 roboflow:
   workspace: maptelligence
   project: object-detection-mbgqz
-  version: 2
+  version: 3
   license: Private
-  url: https://app.roboflow.com/maptelligence/object-detection-mbgqz/2
+  url: https://app.roboflow.com/maptelligence/object-detection-mbgqz/3
