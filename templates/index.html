@@ -5,6 +5,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <style>
         * {
             box-sizing: border-box;
@@ -189,6 +191,13 @@
             align-items: center;
             gap: 6px;
         }
+        .detection-summary-bar .summary-item .color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: 1px solid rgba(0,0,0,0.15);
+            flex: 0 0 10px;
+        }
         .detection-summary-bar .summary-item span.count {
             background: #2563eb;
             color: #fff;
@@ -296,6 +305,12 @@
             align-items: center;
             justify-content: center;
             color: #6b7280;
+        }
+        #mapContainer {
+            width: 100%;
+            height: 100%;
+            border-radius: 12px;
+            overflow: hidden;
         }
 
         .btn-row {
@@ -497,6 +512,18 @@
                 <input type="file" id="fileInput" multiple accept="image/*" style="display:none" />
                 <div class="upload-hint">Obsługiwane formaty: JPG, PNG, TIFF</div>
             </div>
+            <div class="card" id="promptsCard">
+                <h2>Prompty SAM3</h2>
+                <textarea id="promptsInput" placeholder="np.: car, excavator, bulldozer" style="width:100%;min-height:70px;resize:vertical;font-family:inherit;font-size:13px;padding:8px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;"></textarea>
+                <div style="font-size:11px;color:#6b7280;margin-top:6px;line-height:1.4;">
+                    Wpisz listę klas oddzielonych przecinkami. Pozostaw puste aby użyć domyślnych.<br>
+                    Przykład: <code style="background:#eef2ff;padding:2px 4px;border-radius:4px;">car, dump truck, excavator</code>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                    <button class="btn" type="button" onclick="clearPrompts()" style="flex:1;">Wyczyść</button>
+                    <button class="btn" type="button" onclick="applyPrompts()" style="flex:1;">Zastosuj</button>
+                </div>
+            </div>
             <div class="card" id="imagesCard">
                 <h2>Zdjęcia</h2>
                 <div style="margin-bottom: 8px;">
@@ -526,7 +553,7 @@
             </div>
 
             <div class="card">
-                <h2>Generate Report</h2>
+                <h2>Generate AI Report</h2>
                 <div class="btn-row">
                     <a class="btn" href="/report" target="_blank">Generate</a>
                 </div>
@@ -582,12 +609,7 @@
 
             <!-- Map Tab -->
             <div class="tab-content" id="tab-map">
-                <div class="map-placeholder">
-                    <div style="text-align: center;">
-                        <p style="font-size: 18px; margin-bottom: 8px;">🗺️ Site Map</p>
-                        <p style="font-size: 14px;">Integrate Leaflet/Mapbox here</p>
-                    </div>
-                </div>
+                <div id="mapContainer"></div>
             </div>
             <div id="centerDetectionSummary" class="detection-summary-bar">
                 Brak wykrytych obiektów.
@@ -719,7 +741,8 @@
                 wrap.className = 'thumb-wrapper';
 
                 const img = document.createElement('img');
-                img.src = `/uploads/raw/${name}`;
+                // Use preview endpoint to support TIFF/TIF thumbnails
+                img.src = `/preview/raw/${name}`;
                 img.alt = name;
                 img.title = name;
                 img.addEventListener('click', () => showProcessedImage(name));
@@ -759,9 +782,15 @@
             btn.disabled = true;
             btn.textContent = '...';
             
+            const promptsField = document.getElementById('promptsInput');
+            const rawPrompts = promptsField ? promptsField.value.trim() : '';
+            const promptsList = rawPrompts ? rawPrompts.split(',').map(p => p.trim()).filter(p => p.length) : [];
+
             try {
                 const res = await fetch(`/process/${encodeURIComponent(filename)}`, { 
-                    method: 'POST' 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompts: promptsList })
                 });
                 
                 if (!res.ok) {
@@ -789,10 +818,18 @@
         }
 
         async function processAllImages() {
+            const promptsField = document.getElementById('promptsInput');
+            const rawPrompts = promptsField ? promptsField.value.trim() : '';
+            const promptsList = rawPrompts ? rawPrompts.split(',').map(p => p.trim()).filter(p => p.length) : [];
+
             addMessage('🔄 Processing all images...', false);
             
             try {
-                const res = await fetch('/process/all', { method: 'POST' });
+                const res = await fetch('/process/all', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompts: promptsList })
+                });
                 
                 if (!res.ok) {
                     throw new Error('Failed to process images');
@@ -829,6 +866,28 @@
             } catch (e) {
                 console.log('processed images error', e);
             }
+        }
+
+        function clearPrompts() {
+            const el = document.getElementById('promptsInput');
+            if (el) el.value = '';
+            addMessage('🧹 Prompty wyczyszczone (użyję domyślnych).', false);
+        }
+
+        function applyPrompts() {
+            const el = document.getElementById('promptsInput');
+            if (!el) return;
+            const val = el.value.trim();
+            if (!val) {
+                addMessage('ℹ️ Brak własnych promptów — pozostają domyślne.', false);
+                return;
+            }
+            const list = val.split(',').map(p => p.trim()).filter(p => p.length);
+            if (!list.length) {
+                addMessage('⚠️ Nie znaleziono poprawnych promptów.', false);
+                return;
+            }
+            addMessage(`✅ Zastosowano prompty: ${list.join(', ')}`, false);
         }
 
         async function showProcessedImage(rawFilename) {
@@ -888,10 +947,14 @@
                 const data = await res.json();
                 // build map: processed image name -> detections array
                 window.detectionsByImage = {};
+                window.detectionColorMaps = {};
                 if (Array.isArray(data)) {
                     data.forEach(item => {
                         if (item && item.image) {
                             window.detectionsByImage[item.image] = item.detections || [];
+                            if (item.color_map && typeof item.color_map === 'object') {
+                                window.detectionColorMaps[item.image] = item.color_map;
+                            }
                         }
                     });
                 }
@@ -1073,9 +1136,25 @@
                 const label = det.label || det.type || 'unknown';
                 counts[label] = (counts[label] || 0) + 1;
             });
+            const colorMap = (window.detectionColorMaps && window.detectionColorMaps[processedName]) || {};
+            const fallbackPalette = [
+                'rgb(239, 68, 68)',  // red-500
+                'rgb(59, 130, 246)', // blue-500
+                'rgb(16, 185, 129)', // emerald-500
+                'rgb(234, 179, 8)',  // yellow-500
+                'rgb(168, 85, 247)', // purple-500
+                'rgb(245, 158, 11)', // amber-500
+                'rgb(20, 184, 166)', // teal-500
+                'rgb(99, 102, 241)', // indigo-500
+                'rgb(236, 72, 153)', // pink-500
+                'rgb(34, 197, 94)',  // green-500
+            ];
             const parts = Object.entries(counts)
                 .sort((a,b)=>b[1]-a[1])
-                .map(([label,count]) => `<div class="summary-item"><span>${label}</span><span class="count">${count}</span></div>`);
+                .map(([label,count]) => {
+                    const color = colorMap[label] || fallbackPalette[idx % fallbackPalette.length] || 'rgb(59, 130, 246)';
+                    return `<div class=\"summary-item\"><span class=\"color-dot\" style=\"background:${color}\"></span><span>${label}</span><span class=\"count\">${count}</span></div>`;
+                });
             bar.innerHTML = parts.join('');
         }
 
@@ -1292,6 +1371,84 @@
         // Auto-scroll & start assistant
         chatMessages.scrollTop = chatMessages.scrollHeight;
         initAssistant();
+
+        // ─────────────────────────────────────────
+        // Map Tab - Leaflet with GeoTIFF overlays
+        // ─────────────────────────────────────────
+        let map = null;
+        const tiffOverlays = [];
+
+        function initMap() {
+            if (map) return; // already initialized
+            
+            // Default center
+            map = L.map('mapContainer').setView([52.2297, 21.0122], 13);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+            
+            // Load georeferenced TIFFs
+            loadGeoTiffs();
+        }
+
+        async function loadGeoTiffs() {
+            try {
+                const res = await fetch('/geo/images');
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                if (!Array.isArray(data) || data.length === 0) {
+                    console.log('No georeferenced images found');
+                    return;
+                }
+                
+                // Clear existing overlays
+                tiffOverlays.forEach(overlay => map.removeLayer(overlay));
+                tiffOverlays.length = 0;
+                
+                // Add each georeferenced image
+                data.forEach(item => {
+                    if (item.bounds && item.url) {
+                        const bounds = L.latLngBounds(
+                            [item.bounds.south, item.bounds.west],
+                            [item.bounds.north, item.bounds.east]
+                        );
+                        
+                        const overlay = L.imageOverlay(item.url, bounds, {
+                            opacity: 0.9,
+                            interactive: true
+                        }).addTo(map);
+                        
+                        const statusText = item.is_processed ? '✓ Processed with detections' : 'Raw image';
+                        overlay.bindPopup(`<b>${item.filename}</b><br>${statusText}`);
+                        tiffOverlays.push(overlay);
+                    }
+                });
+                
+                // Fit map to show all overlays
+                if (tiffOverlays.length > 0) {
+                    const group = L.featureGroup(tiffOverlays);
+                    map.fitBounds(group.getBounds(), { padding: [50, 50] });
+                }
+            } catch (e) {
+                console.log('Error loading georeferenced images:', e);
+            }
+        }
+
+        // Initialize map when switching to map tab
+        const originalSwitchTab = switchTab;
+        switchTab = function(tabName) {
+            originalSwitchTab(tabName);
+            if (tabName === 'map') {
+                setTimeout(() => {
+                    initMap();
+                    if (map) map.invalidateSize();
+                }, 100);
+            }
+        };
     </script>
 </body>
 </html>
