@@ -5,6 +5,7 @@ import time
 import json
 from werkzeug.utils import secure_filename
 import shutil
+from typing import List, Dict
 
 # ───────────────────────────────────────────────
 # SAM3 + TORCH IMPORTS
@@ -19,6 +20,12 @@ import requests
 # SAM3
 from sam3.model_builder import build_sam3_image_model
 from sam3.model.sam3_image_processor import Sam3Processor
+
+# Llama / HuggingFace
+try:
+    from huggingface_hub import InferenceClient
+except ImportError:
+    InferenceClient = None  # graceful fallback
 
 # ───────────────────────────────────────────────
 # FLASK APP
@@ -92,13 +99,69 @@ model.to(device)
 processor = Sam3Processor(model)
 
 # Tutaj możesz dopisać swoje klasy / prompty
-SEARCH_PROMPTS = ["car", "excavator"]
+SEARCH_PROMPTS = ["car", "excavator", "bulldozer", "dump truck", "crane", "cement mixer", "loader",
+    "backhoe", "road roller", "crane truck"]
 CONF_THRESHOLD = 0.35
+
+# ───────────────────────────────────────────────
+# Llama Assistant – Konfiguracja
+# ───────────────────────────────────────────────
+HF_TOKEN = ""  # Ustaw: export HF_TOKEN="hf_xxx"
+HF_MODEL_ID = os.environ.get("HF_MODEL_ID", "meta-llama/Llama-3.3-70B-Instruct")
+
+ASSISTANT_PERSONA_PL = """
+Jesteś SYSTEMEM WSPARCIA DECYZYJNEGO (DSS) dla Głównego Inspektora Budowy.
+Twoim zadaniem jest analiza danych telemetrycznych z systemu wizyjnego SAM3 (format JSON).
+Nie widzisz obrazu bezpośrednio, ale widzisz parametry obiektów: typ, 'score' (confidence), pozycję i ich liczbę.
+
+KOMPETENCJE:
+1. INWENTARYZACJA – zliczanie maszyn / obiektów.
+2. ANALIZA PRZESTRZENNA – jeśli dostępne dane pozycji (opcjonalnie), oceniasz czy strefy są drożne.
+3. DETEKCJA ANOMALII – obiekty o score < 0.50 oznacz \"[NIEPEWNY - DO WERYFIKACJI]\".
+4. RAPORTOWANIE – odpowiedzi zwięzłe, ustrukturyzowane (bullet points).
+
+WYTYCZNE:
+- Jeśli pytanie ogólne o sytuację: zacznij od statusu: [NORMA] albo [UWAGA].
+- Nie wymyślaj. Jeśli brak danych: \"Brak danych w systemie telemetrycznym\".
+- Używaj języka polskiego.
+"""
+
+assistant_conversation: List[Dict[str, str]] = []  # przechowujemy historię
+
+def load_detection_state() -> Dict[str, Dict]:
+    data = {}
+    try:
+        for name in os.listdir(DETECTIONS_DIR):
+            if name.lower().endswith('.json'):
+                path = os.path.join(DETECTIONS_DIR, name)
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        data[name] = json.load(f)
+                except Exception:
+                    pass
+    except FileNotFoundError:
+        pass
+    return data
+
+def build_system_prompt() -> str:
+    state = load_detection_state()
+    return f"{ASSISTANT_PERSONA_PL}\n\nSTAN AKTUALNY (JSON):\n{json.dumps(state, ensure_ascii=False, indent=2)}"
+
+def ensure_hf_client():
+    if InferenceClient is None:
+        return None
+    if not HF_TOKEN:
+        return None
+    try:
+        return InferenceClient(api_key=HF_TOKEN)
+    except Exception:
+        return None
 
 
 def fast_overlay(image, masks, scores, labels, alpha=0.5):
     """
     Szybkie nakładanie masek + ramki + podpisy.
+    Obiekty tej samej klasy mają stały kolor.
     """
     composite = image.convert("RGBA")
     target_w, target_h = composite.size
@@ -113,6 +176,25 @@ def fast_overlay(image, masks, scores, labels, alpha=0.5):
         font = ImageFont.load_default()
 
     print(f"Nakładanie {len(sorted_idx)} masek na obraz...")
+
+    # Stała paleta kolorów dla klas (powtarza się jeśli klas > palety)
+    base_palette = [
+        (239, 68, 68),   # red-500
+        (16, 185, 129),  # emerald-500
+        (59, 130, 246),  # blue-500
+        (234, 179, 8),   # yellow-500
+        (168, 85, 247),  # purple-500
+        (245, 158, 11),  # amber-500
+        (20, 184, 166),  # teal-500
+        (99, 102, 241),  # indigo-500
+        (236, 72, 153),  # pink-500
+        (34, 197, 94),   # green-500
+    ]
+    unique_labels = []
+    for lbl in labels:
+        if lbl not in unique_labels:
+            unique_labels.append(lbl)
+    label_color_map = {lbl: base_palette[i % len(base_palette)] for i, lbl in enumerate(unique_labels)}
 
     for i in sorted_idx:
         mask_tensor = masks[i]
@@ -133,8 +215,8 @@ def fast_overlay(image, masks, scores, labels, alpha=0.5):
         if mask_im.size != (target_w, target_h):
             mask_im = mask_im.resize((target_w, target_h), resample=Image.NEAREST)
 
-        # 3. kolor + półprzezroczysta warstwa
-        color = np.random.randint(0, 255, (3,), dtype=np.uint8)
+        # 3. kolor zależny od klasy
+        color = label_color_map.get(label, (59, 130, 246))
         mask_for_paste = mask_im.point(lambda p: int(p * alpha) if p > 0 else 0)
 
         color_image = Image.new("RGB", (target_w, target_h), tuple(color))
@@ -151,11 +233,7 @@ def fast_overlay(image, masks, scores, labels, alpha=0.5):
             y_min, y_max = int(y_indices.min()), int(y_indices.max())
             x_min, x_max = int(x_indices.min()), int(x_indices.max())
 
-            draw.rectangle(
-                [x_min, y_min, x_max, y_max],
-                outline=tuple(color),
-                width=2
-            )
+            draw.rectangle([x_min, y_min, x_max, y_max], outline=tuple(color), width=2)
 
             text = f"{label}: {score:.2f}"
             text_y = max(0, y_min - 18)
@@ -279,7 +357,7 @@ def images():
     files = []
     try:
         for name in sorted(os.listdir(RAW_UPLOAD_DIR)):
-            if name.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.tiff', '.bmp')):
+            if name.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.tiff', '.bmp', '.tif')):
                 files.append(name)
     except FileNotFoundError:
         pass
@@ -294,7 +372,7 @@ def processed_images():
     files = []
     try:
         for name in sorted(os.listdir(RESULT_DIR)):
-            if name.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.tiff', '.bmp')):
+            if name.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.tiff', '.bmp', '.tif')):
                 files.append(name)
     except FileNotFoundError:
         pass
@@ -376,7 +454,7 @@ def process_all():
     """
     try:
         raw_images = [name for name in os.listdir(RAW_UPLOAD_DIR) 
-                      if name.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.tiff', '.bmp'))]
+                      if name.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.tiff', '.bmp', '.tif'))]
     except FileNotFoundError:
         return jsonify({"error": "no raw images found"}), 404
     
@@ -501,6 +579,97 @@ def detections():
 
     return jsonify(results)
 
+@app.route('/detections/file/<path:filename>')
+def detection_file(filename):
+    """Zwraca pojedynczy plik JSON z katalogu detections/"""
+    safe = secure_filename(filename)
+    if safe != filename:
+        return jsonify({"error": "invalid filename"}), 400
+    path = os.path.join(DETECTIONS_DIR, safe)
+    if not os.path.isfile(path):
+        return jsonify({"error": "not found"}), 404
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ───────────────────────────────────────────────
+# Assistant (Llama) Endpoints
+# ───────────────────────────────────────────────
+@app.route('/assistant/init', methods=['POST'])
+def assistant_init():
+    """Inicjalizuje konwersację z asystentem – ładuje stan i zwraca podsumowanie."""
+    client = ensure_hf_client()
+    assistant_conversation.clear()
+    system_prompt = build_system_prompt()
+    assistant_conversation.append({"role": "system", "content": system_prompt})
+
+    if client is None:
+        return jsonify({
+            "status": "error",
+            "error": "Brak klienta HF. Ustaw zmienną środowiskową HF_TOKEN.",
+            "needs_token": True
+        }), 503
+
+    # Pytanie inicjujące
+    user_msg = "Zamelduj gotowość i podsumuj wczytane dane."
+    assistant_conversation.append({"role": "user", "content": user_msg})
+    try:
+        resp = client.chat.completions.create(
+            model=HF_MODEL_ID,
+            messages=assistant_conversation,
+            max_tokens=600,
+            temperature=0.6
+        )
+        reply = resp.choices[0].message.content
+        assistant_conversation.append({"role": "assistant", "content": reply})
+        return jsonify({
+            "status": "ok",
+            "reply": reply
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+
+REFRESH_KEYWORDS = {"aktualizuj", "refresh", "odswiez"}
+
+@app.route('/assistant/message', methods=['POST'])
+def assistant_message():
+    data = request.get_json(silent=True) or {}
+    message = (data.get('message') or '').strip()
+    if not message:
+        return jsonify({"error": "empty message"}), 400
+
+    client = ensure_hf_client()
+    if client is None:
+        return jsonify({"error": "Brak klienta HF (HF_TOKEN?)"}), 503
+
+    updated = False
+    # Komenda odświeżenia
+    if message.lower() in REFRESH_KEYWORDS:
+        updated = True
+        state_prompt = f"[SYSTEM UPDATE - {time.strftime('%H:%M:%S')}] Otrzymano nowe dane telemetryczne. Zastępują poprzedni stan.\n\nNOWE DANE (JSON):\n{json.dumps(load_detection_state(), ensure_ascii=False, indent=2)}"
+        assistant_conversation.append({"role": "system", "content": state_prompt})
+        # Automatyczne pytanie porównawcze
+        assistant_conversation.append({"role": "user", "content": "Potwierdź odbiór nowych danych. Co się zmieniło względem poprzedniego stanu?"})
+    else:
+        assistant_conversation.append({"role": "user", "content": message})
+
+    try:
+        resp = client.chat.completions.create(
+            model=HF_MODEL_ID,
+            messages=assistant_conversation,
+            max_tokens=800,
+            temperature=0.6
+        )
+        reply = resp.choices[0].message.content
+        assistant_conversation.append({"role": "assistant", "content": reply})
+        return jsonify({"status": "ok", "reply": reply, "updated": updated})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/progress')
 def progress():
@@ -523,5 +692,50 @@ def report():
     return jsonify(report)
 
 
+def _clear_all_json_detections():
+    """Usuwa wszystkie pliki .json z katalogu detections przy starcie aplikacji."""
+    try:
+        removed = 0
+        for name in os.listdir(DETECTIONS_DIR):
+            if name.lower().endswith('.json'):
+                try:
+                    os.remove(os.path.join(DETECTIONS_DIR, name))
+                    removed += 1
+                except OSError:
+                    pass
+        if removed:
+            print(f"[STARTUP] Usunięto {removed} plik(ów) JSON z detections/")
+        else:
+            print("[STARTUP] Brak plików JSON do usunięcia w detections/")
+    except FileNotFoundError:
+        print("[STARTUP] Katalog detections/ nie istnieje – pomijam czyszczenie")
+
+def _clear_all_images():
+    """Usuwa wszystkie obrazy z katalogów uploads_raw oraz uploads przy każdym starcie serwera."""
+    removed_raw = 0
+    removed_processed = 0
+    for directory, counter_name in [
+        (RAW_UPLOAD_DIR, 'RAW'),
+        (RESULT_DIR, 'PROCESSED')
+    ]:
+        try:
+            for name in os.listdir(directory):
+                lower = name.lower()
+                if lower.endswith(('.jpg', '.jpeg', '.png', '.gif', '.tiff', '.bmp', '.tif')):
+                    path = os.path.join(directory, name)
+                    try:
+                        os.remove(path)
+                        if directory == RAW_UPLOAD_DIR:
+                            removed_raw += 1
+                        else:
+                            removed_processed += 1
+                    except OSError:
+                        pass
+        except FileNotFoundError:
+            pass
+    print(f"[STARTUP] Usunięto {removed_raw} RAW i {removed_processed} PROCESSED obraz(ów)")
+
 if __name__ == '__main__':
+    _clear_all_json_detections()
+    _clear_all_images()
     app.run(debug=True, port=5000)
