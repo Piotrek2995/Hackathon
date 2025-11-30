@@ -167,6 +167,36 @@
             display: flex;
             flex-direction: column;
         }
+        .detection-summary-bar {
+            margin-top: 8px;
+            padding: 10px 14px;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 13px;
+            color: #334155;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .detection-summary-bar .summary-item {
+            background: #fff;
+            padding: 4px 10px;
+            border-radius: 20px;
+            border: 1px solid #cbd5e1;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .detection-summary-bar .summary-item span.count {
+            background: #2563eb;
+            color: #fff;
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 12px;
+            line-height: 1;
+        }
         .tabs-header {
             display: flex;
             gap: 4px;
@@ -214,13 +244,28 @@
             padding: 20px;
             color: #6b7280;
             font-weight: 500;
-            overflow: auto;
+            overflow: hidden; /* enable pan within container */
+            position: relative;
         }
         .processed-image-display {
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
             border-radius: 8px;
+            transition: transform 0.2s ease;
+            transform-origin: center center;
+            cursor: zoom-in;
+            user-select: none;
+        }
+        .processed-image-display:hover {
+            transform: scale(1.05);
+        }
+        .processed-image-display.zoomed {
+            transform: scale(1.6);
+            cursor: zoom-out;
+        }
+        .processed-image-display.zoomed:hover {
+            transform: scale(1.6);
         }
         .charts-container {
             display: grid;
@@ -277,15 +322,17 @@
         /* AI Chatbot Side Panel */
         .chatbot-panel {
             width: 360px;
+            height: calc(100vh - 80px); /* fixed card size */
+            max-height: calc(100vh - 32px); /* prevent overflow on very small screens */
             background: white;
             display: flex;
             flex-direction: column;
             border: 1px solid #e5e7eb;
-            border-right: none; /* flush with edge */
-            border-radius: 16px 0 0 16px; /* rounded like cards on exposed edges */
+            border-right: none;
+            border-radius: 16px 0 0 16px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            overflow: hidden; /* round header corners */
-            margin: 16px 16px 16px 0; /* breathing space */
+            margin: 16px 16px 16px 0;
+            overflow: hidden; /* contain inner scroll */
         }
         .chatbot-header {
             padding: 18px 20px;
@@ -304,14 +351,18 @@
             opacity: 0.9;
         }
         .chat-messages {
-            flex: 1;
+            flex: 1 1 auto; /* fill remaining height */
             padding: 18px 20px 12px 20px;
-            overflow-y: auto;
             display: flex;
             flex-direction: column;
             gap: 12px;
             background: #ffffff;
+            overflow-y: auto; /* scroll only messages */
         }
+        .chat-messages::-webkit-scrollbar { width: 8px; }
+        .chat-messages::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .chat-messages::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+        .chat-messages::-webkit-scrollbar-thumb:hover { background: #64748b; }
         .message {
             max-width: 85%;
             padding: 12px 16px;
@@ -538,6 +589,9 @@
                     </div>
                 </div>
             </div>
+            <div id="centerDetectionSummary" class="detection-summary-bar">
+                Brak wykrytych obiektów.
+            </div>
         </div>
     </div>
 
@@ -580,6 +634,8 @@
         const chatMessages = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
         const typingIndicator = document.getElementById('typingIndicator');
+        // Track images uploaded in this browser session
+        const sessionUploaded = new Set();
 
         // Drag & Drop upload logic
         const uploadArea = document.getElementById('uploadArea');
@@ -627,6 +683,11 @@
                     body: formData
                 });
                 if (!res.ok) throw new Error('Upload failed');
+                const payload = await res.json();
+                // Add uploaded filenames to session tracker
+                if (payload && Array.isArray(payload.uploaded)) {
+                    payload.uploaded.forEach(name => sessionUploaded.add(name));
+                }
                 addMessage('✅ Przesłano zdjęcia pomyślnie.', false);
                 await fetchImages();
                 await fetchDetections();
@@ -784,18 +845,19 @@
                 display.innerHTML = `
                     <img src="/uploads/processed/${processedName}" 
                          class="processed-image-display" 
-                         alt="Processed ${rawFilename}">
+                         alt="Processed image">
                 `;
+                updateImageSummary(processedName);
             } else {
                 display.innerHTML = `
                     <div style="text-align: center;">
-                        <p style="font-size: 18px; margin-bottom: 12px;">📷 ${rawFilename}</p>
                         <img src="/uploads/raw/${rawFilename}" 
                              style="max-width: 80%; max-height: 60vh; border-radius: 8px; margin-bottom: 16px;"
-                             alt="${rawFilename}">
-                        <p style="font-size: 14px; color: #6b7280;">Not processed yet - click "Process" button to analyze</p>
+                             alt="Raw image">
+                        <p style="font-size: 14px; color: #6b7280;">Nie przetworzono jeszcze - kliknij "Process" aby przeanalizować</p>
                     </div>
                 `;
+                updateImageSummary(null);
             }
         }
 
@@ -824,6 +886,15 @@
                 const res = await fetch('/detections');
                 if (!res.ok) return;
                 const data = await res.json();
+                // build map: processed image name -> detections array
+                window.detectionsByImage = {};
+                if (Array.isArray(data)) {
+                    data.forEach(item => {
+                        if (item && item.image) {
+                            window.detectionsByImage[item.image] = item.detections || [];
+                        }
+                    });
+                }
                 renderDetectionsPreview(data);
             } catch (e) {
                 console.log('detections error', e);
@@ -833,7 +904,12 @@
         function renderDetectionsPreview(list) {
             if (!detectionsPreview) return;
 
-            if (!list || !list.length) {
+            // Filter to only show detections for images uploaded in THIS session
+            const filtered = Array.isArray(list)
+                ? list.filter(item => sessionUploaded.has(item.raw_image))
+                : [];
+
+            if (!filtered.length) {
                 detectionsPreview.innerHTML =
                     '<div style="font-size:12px;color:#6b7280;">Brak danych</div>';
                 return;
@@ -841,7 +917,7 @@
 
             // backend już zwraca najnowsze jako pierwsze,
             // ale robimy kopię na wszelki wypadek
-            const ordered = [...list];
+            const ordered = [...filtered];
 
             let html = '';
 
@@ -863,7 +939,6 @@
                              style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;">
                         <div>
                             <div style="font-size:13px;font-weight:500;">${title}</div>
-                            <div style="font-size:12px;color:#6b7280;">Plik: ${imgName}</div>
                             <div style="font-size:12px;color:#6b7280;">Obiektów: ${dets.length}</div>
                             <div style="font-size:12px;color:#6b7280;">
                                 Klasy: ${uniqueLabels.length ? uniqueLabels.join(', ') : 'brak'}
@@ -884,8 +959,9 @@
             display.innerHTML = `
                 <img src="/uploads/processed/${processedName}" 
                      class="processed-image-display" 
-                     alt="Processed ${processedName}">
+                     alt="Processed image">
             `;
+            updateImageSummary(processedName);
         }
 
         function switchTab(tabName) {
@@ -913,7 +989,11 @@
             try {
                 const res = await fetch('/detections');
                 if (!res.ok) return;
-                const data = await res.json();
+                const allData = await res.json();
+                // Only include session uploads in charts as well
+                const data = Array.isArray(allData)
+                    ? allData.filter(item => sessionUploaded.has(item.raw_image))
+                    : [];
                 
                 // Process data for charts
                 const objectCounts = {};
@@ -978,6 +1058,25 @@
             });
             html += '</div>';
             canvas.parentElement.innerHTML = `<h3>Object Detection Summary</h3>${html}`;
+        }
+
+        function updateImageSummary(processedName) {
+            const bar = document.getElementById('centerDetectionSummary');
+            if (!bar) return;
+            if (!processedName || !window.detectionsByImage || !window.detectionsByImage[processedName] || window.detectionsByImage[processedName].length === 0) {
+                bar.textContent = 'Brak wykrytych obiektów dla wybranego zdjęcia.';
+                return;
+            }
+            const dets = window.detectionsByImage[processedName];
+            const counts = {};
+            dets.forEach(det => {
+                const label = det.label || det.type || 'unknown';
+                counts[label] = (counts[label] || 0) + 1;
+            });
+            const parts = Object.entries(counts)
+                .sort((a,b)=>b[1]-a[1])
+                .map(([label,count]) => `<div class="summary-item"><span>${label}</span><span class="count">${count}</span></div>`);
+            bar.innerHTML = parts.join('');
         }
 
         function renderSimpleTimelineChart(canvasId, timeline) {
@@ -1051,10 +1150,47 @@
             }
         }
 
+        function escapeHtml(str) {
+            return str.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+        }
+        function renderMarkdown(md) {
+            // basic markdown (bold **, italics *, bullets -, code blocks ```)
+            let html = escapeHtml(md);
+            // code blocks
+            html = html.replace(/```([\s\S]*?)```/g, (m, code) => `<pre style="background:#1e293b;color:#f8fafc;padding:10px;border-radius:8px;overflow:auto;font-size:12px"><code>${escapeHtml(code.trim())}</code></pre>`);
+            // bold
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            // italics
+            html = html.replace(/(^|\s)\*(.*?)\*(?=\s|$)/g, '$1<em>$2</em>');
+            // inline code
+            html = html.replace(/`([^`]+)`/g, '<code style="background:#e2e8f0;padding:2px 4px;border-radius:4px;font-size:12px">$1</code>');
+            // bullets to list (simple)
+            if (/^- /m.test(md)) {
+                const lines = html.split(/\n+/);
+                let inList = false; let out=[];
+                lines.forEach(l => {
+                    if (/^\- /.test(l)) {
+                        if (!inList) { out.push('<ul style="margin:4px 0 8px 16px;padding:0;">'); inList = true; }
+                        out.push(`<li style="margin-bottom:4px;">${l.substring(2)}</li>`);
+                    } else { if (inList) { out.push('</ul>'); inList = false; } out.push(l); }
+                });
+                if (inList) out.push('</ul>');
+                html = out.join('\n');
+            }
+            // headings (#, ##)
+            html = html.replace(/^### (.*)$/gm,'<h4 style="margin:8px 0 4px;font-size:14px;">$1</h4>')
+                       .replace(/^## (.*)$/gm,'<h3 style="margin:10px 0 6px;font-size:15px;">$1</h3>')
+                       .replace(/^# (.*)$/gm,'<h2 style="margin:12px 0 8px;font-size:16px;">$1</h2>');
+            return html;
+        }
         function addMessage(text, isUser = false) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
-            messageDiv.textContent = text;
+            if (isUser) {
+                messageDiv.textContent = text;
+            } else {
+                messageDiv.innerHTML = renderMarkdown(text);
+            }
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
@@ -1068,31 +1204,94 @@
             typingIndicator.classList.remove('active');
         }
 
+        // Click-to-zoom for processed image in center display
+        document.addEventListener('click', function(e) {
+            const target = e.target;
+            if (target && target.classList && target.classList.contains('processed-image-display')) {
+                target.classList.toggle('zoomed');
+            }
+        });
+
+        // Hover pan while zoomed: move transform-origin with cursor
+        (function() {
+            const processedDisplayEl = document.getElementById('processedDisplay');
+            if (!processedDisplayEl) return;
+
+            let rafId = null;
+            let pendingOrigin = null;
+
+            function applyOrigin() {
+                if (!pendingOrigin) return;
+                const img = processedDisplayEl.querySelector('.processed-image-display.zoomed');
+                if (img) {
+                    img.style.transformOrigin = pendingOrigin;
+                }
+                rafId = null;
+            }
+
+            processedDisplayEl.addEventListener('mousemove', function(e) {
+                const img = processedDisplayEl.querySelector('.processed-image-display.zoomed');
+                if (!img) return;
+                const rect = processedDisplayEl.getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width) * 100;
+                const y = ((e.clientY - rect.top) / rect.height) * 100;
+                pendingOrigin = `${x}% ${y}%`;
+                if (!rafId) rafId = requestAnimationFrame(applyOrigin);
+            });
+
+            processedDisplayEl.addEventListener('mouseleave', function() {
+                const img = processedDisplayEl.querySelector('.processed-image-display.zoomed');
+                if (img) {
+                    img.style.transformOrigin = '50% 50%';
+                }
+            });
+        })();
+
+        async function initAssistant() {
+            showTyping();
+            try {
+                const res = await fetch('/assistant/init', {method: 'POST'});
+                const data = await res.json();
+                hideTyping();
+                if (!res.ok || data.status !== 'ok') {
+                    addMessage(data.error || 'Błąd inicjalizacji asystenta (ustaw HF_TOKEN).');
+                    return;
+                }
+                addMessage(data.reply);
+            } catch (e) {
+                hideTyping();
+                addMessage('Błąd połączenia z asystentem.');
+            }
+        }
+
         async function sendMessage() {
             const message = chatInput.value.trim();
             if (!message) return;
-
             addMessage(message, true);
             chatInput.value = '';
-
             showTyping();
-
-            setTimeout(() => {
+            try {
+                const res = await fetch('/assistant/message', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message})
+                });
+                const data = await res.json();
                 hideTyping();
-                const responses = [
-                    'Na podstawie danych wykryłem 2 koparki i 1 dźwig na budowie.',
-                    'Postęp projektu wynosi obecnie 42%. Trwają prace ziemne.',
-                    'Czy chcesz, żebym wygenerował szczegółowy raport?',
-                    'Mogę przeanalizować zdjęcia z budowy. Prześlij je, a opowiem Ci co widzę.',
-                    'Zauważyłem wzrost aktywności maszyn w ciągu ostatnich 3 dni.'
-                ];
-                const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-                addMessage(randomResponse);
-            }, 1000 + Math.random() * 1000);
+                if (!res.ok || data.status === 'error' || data.error) {
+                    addMessage(data.error || 'Błąd odpowiedzi asystenta');
+                    return;
+                }
+                addMessage(data.reply);
+            } catch (e) {
+                hideTyping();
+                addMessage('Błąd sieci podczas wysyłania wiadomości.');
+            }
         }
 
-        // Auto-scroll to bottom on load
+        // Auto-scroll & start assistant
         chatMessages.scrollTop = chatMessages.scrollHeight;
+        initAssistant();
     </script>
 </body>
 </html>
