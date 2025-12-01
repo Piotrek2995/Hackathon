@@ -74,7 +74,7 @@ http://localhost:5000
 ## Uwaga
 
 * Aplikacja wykrywa urządzenie CUDA jeśli jest dostępne i automatycznie używa GPU do przyspieszenia SAM3.
-* Jeśli nie chcesz używać agenta AI, usuń/nie podawaj `GROQ_API_KEY` albo usuń plik `ai_agent.py`.
+* Jeśli chcesz używać agenta AI, podaj `GROQ_API_KEY`.
 
 ### Twórcy
 
